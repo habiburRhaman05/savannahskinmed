@@ -61,7 +61,7 @@ function Field({
         autoComplete={autoComplete}
         placeholder={label}
         required
-        className="w-full rounded-lg border border-white/45 bg-transparent px-3 py-2 sm:px-4 sm:py-3 font-sans text-[13px] sm:text-[16px] text-white outline-none transition placeholder:text-white/90 focus:border-white focus:bg-white/10"
+        className="w-full rounded-lg border border-white/45 bg-transparent px-3 py-2 sm:px-4 sm:py-3 font-sans text-[13px] sm:text-[16px] text-white outline-none transition placeholder:text-white/[...]
       />
     </div>
   );
@@ -357,6 +357,26 @@ export default function BookingModal({
        * Webhook response does NOT change this.
        */
       setSubmitting(false);
+
+      // Push a dataLayer event so Google Tag Manager picks up the successful booking
+      try {
+        (window as any).dataLayer = (window as any).dataLayer || [];
+        (window as any).dataLayer.push({
+          event: 'form_submit',
+          formId: 'book_appointment',
+          formName: 'Book Appointment',
+          formLocation: getPageTag() || 'booking_modal',
+          page_path: window.location.pathname,
+          page_url: window.location.href,
+          submitted_at: new Date().toISOString(),
+        });
+        // eslint-disable-next-line no-console
+        console.log('[GTM] dataLayer event pushed: form_submit');
+      } catch (dlErr) {
+        // eslint-disable-next-line no-console
+        console.warn('[GTM] dataLayer push failed', dlErr);
+      }
+
       setSent(true);
     } catch (submitError) {
       console.error(
@@ -474,7 +494,7 @@ export default function BookingModal({
             <button
               type="submit"
               disabled={submitting}
-              className="!mt-3 sm:!mt-4 w-full rounded-full bg-teal px-8 py-2.5 sm:py-3.5 font-sans text-[13px] sm:text-[15px] font-medium uppercase tracking-widest2 text-white transition-colors hover:bg-teal-dark disabled:opacity-60"
+              className="!mt-3 sm:!mt-4 w-full rounded-full bg-teal px-8 py-2.5 sm:py-3.5 font-sans text-[13px] sm:text-[15px] font-medium uppercase tracking-widest2 text-white transition-colors [...]
             >
               {submitting ? 'Sending…' : 'Next Step'}
             </button>
