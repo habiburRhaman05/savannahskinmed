@@ -61,6 +61,10 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const [settings, footer] = await Promise.all([getSiteSettings(), getFooterData()]);
 
+  // Env fallback so GA never silently disappears if the DB settings row is
+  // empty or the DB is unreachable.
+  const gaId = settings.googleAnalyticsId || process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID || '';
+
   return (
     <html
       lang="en"
@@ -73,17 +77,17 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           <style>{`[data-reveal]{opacity:1 !important;transform:none !important}`}</style>
         </noscript>
 
-        {settings.googleAnalyticsId && (
+        {gaId && (
           <>
             <Script
-              src={`https://www.googletagmanager.com/gtag/js?id=${settings.googleAnalyticsId}`}
+              src={`https://www.googletagmanager.com/gtag/js?id=${gaId}`}
               strategy="afterInteractive"
             />
             <Script id="ga4-init" strategy="afterInteractive">
               {`window.dataLayer = window.dataLayer || [];
                 function gtag(){dataLayer.push(arguments);}
                 gtag('js', new Date());
-                gtag('config', '${settings.googleAnalyticsId}');`}
+                gtag('config', '${gaId}');`}
             </Script>
           </>
         )}

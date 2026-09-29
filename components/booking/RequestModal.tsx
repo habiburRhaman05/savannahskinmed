@@ -113,15 +113,6 @@ export default function RequestModal({ open, onClose }: RequestModalProps) {
     if (open) {
       document.body.style.overflow = 'hidden';
       closeRef.current?.focus();
-      if (!hasStarted) {
-        pushFormStart({
-          formId: 'request_modal',
-          formName: 'Membership Request',
-          page_path: window.location.pathname,
-          page_url: window.location.href,
-        });
-        setHasStarted(true);
-      }
     } else {
       document.body.style.overflow = '';
       setHasStarted(false);
@@ -133,7 +124,9 @@ export default function RequestModal({ open, onClose }: RequestModalProps) {
     return () => {
       document.body.style.overflow = '';
     };
-  }, [open, hasStarted]);
+    // form_start fires from onFocusCapture on the <form> (first real interaction),
+    // NOT from the modal-open effect — opening the modal is not a form interaction.
+  }, [open]);
 
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {

@@ -132,15 +132,6 @@ export default function BookingModal({
       return;
     }
 
-    pushFormStart({
-      formId: 'booking_modal',
-      formName: 'Book Appointment',
-      page_path: window.location.pathname,
-      page_url: window.location.href,
-      submitted_at: new Date().toISOString(),
-    });
-    setHasStarted(true);
-
     const previous = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
     closeRef.current?.focus();
@@ -199,6 +190,8 @@ export default function BookingModal({
     });
     setHasStarted(true);
   };
+  // form_start fires from onFocusCapture on the <form> (first real interaction),
+  // NOT from the modal-open effect — opening the modal is not a form interaction.
 
   const sendToHighLevel = async (data: FormData) => {
     const pageTag = getPageTag();
