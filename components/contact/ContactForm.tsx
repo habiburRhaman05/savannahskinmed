@@ -13,6 +13,19 @@ const fields = [
   { name: 'email', placeholder: 'Email', type: 'email', autoComplete: 'email' },
 ] as const;
 
+function pushGtmFormSubmitEvent(details: Record<string, unknown>) {
+  if (typeof window === 'undefined') return;
+  try {
+    (window as any).dataLayer = (window as any).dataLayer || [];
+    (window as any).dataLayer.push({ event: 'form_submit', ...details });
+    // eslint-disable-next-line no-console
+    console.log('[GTM] dataLayer pushed', { event: 'form_submit', ...details });
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.warn('[GTM] dataLayer push failed', err);
+  }
+}
+
 export default function ContactForm() {
   const [sent, setSent] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -28,6 +41,7 @@ export default function ContactForm() {
     if (result.ok) {
       setSent(true);
       form.reset();
+      pushGtmFormSubmitEvent({ formId: 'contact_form', formName: 'Contact Form', page_path: window.location.pathname, page_url: window.location.href });
     } else {
       setError(result.error);
     }
