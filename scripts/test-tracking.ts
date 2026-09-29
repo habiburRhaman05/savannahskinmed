@@ -170,7 +170,7 @@ async function main() {
   // ---------- 10. No throw when dataLayer missing entirely (edge case) ----------
   {
     const w = freshEnv({ withGtag: true });
-    delete w.dataLayer; // simulate script order weirdness
+    delete (w as { dataLayer?: unknown[] }).dataLayer; // simulate script order weirdness
     let threw = false;
     try {
       trackEvent('edge_case');
