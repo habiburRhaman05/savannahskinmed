@@ -5,6 +5,7 @@ import { useEffect, useRef, useState, type FormEvent } from 'react';
 
 import { CloseIcon } from '@/components/icons';
 import { submitMembershipRequest } from '@/app/actions/submissions';
+import { pushFormStart, pushFormSubmit } from '@/lib/gtm';
 
 const LOCATIONS = ['Pooler / Savannah', 'Statesboro'];
 
@@ -99,6 +100,7 @@ export default function RequestModal({ open, onClose }: RequestModalProps) {
   const [sent, setSent] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [hasStarted, setHasStarted] = useState(false);
 
   const panelRef = useRef<HTMLDivElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
@@ -111,8 +113,18 @@ export default function RequestModal({ open, onClose }: RequestModalProps) {
     if (open) {
       document.body.style.overflow = 'hidden';
       closeRef.current?.focus();
+      if (!hasStarted) {
+        pushFormStart({
+          formId: 'request_modal',
+          formName: 'Membership Request',
+          page_path: window.location.pathname,
+          page_url: window.location.href,
+        });
+        setHasStarted(true);
+      }
     } else {
       document.body.style.overflow = '';
+      setHasStarted(false);
       setTimeout(() => {
         setSent(false);
         setError(null);
@@ -121,7 +133,7 @@ export default function RequestModal({ open, onClose }: RequestModalProps) {
     return () => {
       document.body.style.overflow = '';
     };
-  }, [open]);
+  }, [open, hasStarted]);
 
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
@@ -142,16 +154,26 @@ export default function RequestModal({ open, onClose }: RequestModalProps) {
     const formData = new FormData(e.currentTarget);
     const result = await submitMembershipRequest(formData);
     setSubmitting(false);
+
     if (result.ok) {
+      console.debug('[Request] successful submit; pushing form_submit');
+      pushFormSubmit({
+        formId: 'request_modal',
+        formName: 'Membership Request',
+        page_path: window.location.pathname,
+        page_url: window.location.href,
+        submitted_at: new Date().toISOString(),
+      });
       setSent(true);
-    } else {
-      setError(result.error);
+      return;
     }
+
+    setError(result.error);
   };
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[100]  h-screen flex items-start justify-center overflow-y-auto bg-black/40 px-4 py-6 backdrop-blur-md sm:py-8"
+      className="fixed inset-0 z-[100] h-screen flex items-start justify-center overflow-y-auto bg-black/40 px-4 py-6 backdrop-blur-md sm:py-8"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
@@ -191,7 +213,21 @@ export default function RequestModal({ open, onClose }: RequestModalProps) {
             </button>
           </div>
         ) : (
-          <form onSubmit={handleSubmit} className="mt-7 space-y-3">
+          <form
+            onSubmit={handleSubmit}
+            onFocusCapture={() => {
+              if (!hasStarted) {
+                pushFormStart({
+                  formId: 'request_modal',
+                  formName: 'Membership Request',
+                  page_path: window.location.pathname,
+                  page_url: window.location.href,
+                });
+                setHasStarted(true);
+              }
+            }}
+            className="mt-7 space-y-3"
+          >
             <Field id="name" label="Name" autoComplete="name" />
             <Field id="email" label="E-mail Address" type="email" autoComplete="email" />
             <Field id="phone" label="Phone" type="tel" autoComplete="tel" />
