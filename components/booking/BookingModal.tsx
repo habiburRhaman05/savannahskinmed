@@ -6,24 +6,13 @@ import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { CloseIcon } from '@/components/icons';
 import { footerServices } from '@/lib/site';
 import { submitBooking } from '@/app/actions/submissions';
+import { pushFormStart, pushFormSubmit } from '@/lib/gtm';
 
 const LOCATIONS = ['Pooler / Savannah', 'Statesboro'];
 
 const HIGHLEVEL_WEBHOOK_URL =
   'https://services.leadconnectorhq.com/hooks/TCgWNSOqArBjmBL22qrU/webhook-trigger/92b8b77f-2205-41e5-b434-459a7829b9d0';
 
-/**
- * Add the EXACT ACRM page tags here when you have the client's
- * page -> tag reference list.
- *
- * Example:
- *
- * '/services/hormone-therapy': 'hormone-therapy',
- * '/services/weight-management': 'weight-management',
- *
- * Until a page is mapped here, the lead will still receive
- * the required "website-leads" tag.
- */
 const PAGE_TAGS: Record<string, string> = {
   // '/': 'homepage',
   // '/services/hormone-therapy': 'hormone-therapy',
@@ -126,6 +115,7 @@ export default function BookingModal({
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [stepOneData, setStepOneData] = useState<FormData | null>(null);
+  const [hasStarted, setHasStarted] = useState(false);
 
   const panelRef = useRef<HTMLDivElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
@@ -133,7 +123,23 @@ export default function BookingModal({
   useEffect(() => setMounted(true), []);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      setStep(1);
+      setSent(false);
+      setError(null);
+      setStepOneData(null);
+      setHasStarted(false);
+      return;
+    }
+
+    pushFormStart({
+      formId: 'booking_modal',
+      formName: 'Book Appointment',
+      page_path: window.location.pathname,
+      page_url: window.location.href,
+      submitted_at: new Date().toISOString(),
+    });
+    setHasStarted(true);
 
     const previous = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
@@ -173,15 +179,6 @@ export default function BookingModal({
     };
   }, [open, onClose]);
 
-  useEffect(() => {
-    if (!open) {
-      setStep(1);
-      setSent(false);
-      setError(null);
-      setStepOneData(null);
-    }
-  }, [open]);
-
   if (!open || !mounted) return null;
 
   const getPageTag = () => {
@@ -191,26 +188,16 @@ export default function BookingModal({
     return PAGE_TAGS[pathname] || null;
   };
 
-  const pushGtmFormSubmitEvent = (formName: string) => {
-    if (typeof window === 'undefined') return;
-
-    const existingDataLayer = (window as Window & {
-      dataLayer?: Record<string, unknown>[];
-    }).dataLayer;
-
-    const dataLayer = existingDataLayer || [];
-
-    dataLayer.push({
-      event: 'form_submit',
-      formId: 'book_appointment',
-      formName,
-      formLocation: getPageTag() || 'booking_modal',
+  const handleFormFocusCapture = () => {
+    if (hasStarted) return;
+    pushFormStart({
+      formId: 'booking_modal',
+      formName: 'Book Appointment',
       page_path: window.location.pathname,
       page_url: window.location.href,
       submitted_at: new Date().toISOString(),
     });
-
-    (window as Window & { dataLayer?: Record<string, unknown>[] }).dataLayer = dataLayer;
+    setHasStarted(true);
   };
 
   const sendToHighLevel = async (data: FormData) => {
@@ -276,7 +263,6 @@ export default function BookingModal({
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-
     const data = new FormData(event.currentTarget);
 
     setError(null);
@@ -291,8 +277,16 @@ export default function BookingModal({
         return;
       }
 
+      console.debug('[Booking] successful submit; pushing form_submit');
+      pushFormSubmit({
+        formId: 'booking_modal',
+        formName: 'Book Appointment',
+        page_path: window.location.pathname,
+        page_url: window.location.href,
+        submitted_at: new Date().toISOString(),
+      });
+
       await sendToHighLevel(data);
-      pushGtmFormSubmitEvent('Book Appointment');
 
       setSubmitting(false);
       setSent(true);
@@ -353,6 +347,7 @@ export default function BookingModal({
         ) : (
           <form
             onSubmit={handleSubmit}
+            onFocusCapture={handleFormFocusCapture}
             className="mt-2 space-y-1 sm:mt-4 sm:space-y-2"
           >
             <div className="space-y-3 sm:space-y-4">
