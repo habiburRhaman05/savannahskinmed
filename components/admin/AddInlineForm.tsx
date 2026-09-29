@@ -1,8 +1,9 @@
 'use client';
 
-import { createContext, useContext, useRef, useTransition } from 'react';
+import { createContext, useContext, useRef, useState, useTransition } from 'react';
 
 import { alertError, alertSuccess } from '@/lib/adminAlerts';
+import { pushFormStart, pushFormSubmit } from '@/lib/gtm';
 
 type Props = {
   action: (formData: FormData) => Promise<void>;
@@ -13,20 +14,14 @@ type Props = {
 
 const PendingContext = createContext(false);
 
-/** Read from `PendingSubmitButton` (or any custom submit control) to reflect
- * this form's in-flight state without needing a render-prop function — a
- * plain function can't be passed from a Server Component page into this
- * Client Component as `children`, so state is shared via context instead. */
 export function usePendingForm() {
   return useContext(PendingContext);
 }
 
-/** Wraps a small "Add ___" form (Add Location, Add Hours Row, etc.) so
- * submitting it shows a SweetAlert success toast and resets the fields,
- * instead of a plain native form POST with no feedback. */
 export default function AddInlineForm({ action, successMessage, className, children }: Props) {
   const formRef = useRef<HTMLFormElement>(null);
   const [pending, startTransition] = useTransition();
+  const [hasStarted, setHasStarted] = useState(false);
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -35,6 +30,14 @@ export default function AddInlineForm({ action, successMessage, className, child
       try {
         await action(formData);
         formRef.current?.reset();
+        console.debug('[Admin Form] successful submit; pushing form_submit');
+        pushFormSubmit({
+          formId: 'admin_inline_form',
+          formName: successMessage,
+          page_path: window.location.pathname,
+          page_url: window.location.href,
+          submitted_at: new Date().toISOString(),
+        });
         await alertSuccess(successMessage);
       } catch (err) {
         await alertError('Something went wrong', err instanceof Error ? err.message : undefined);
@@ -43,7 +46,22 @@ export default function AddInlineForm({ action, successMessage, className, child
   };
 
   return (
-    <form ref={formRef} onSubmit={handleSubmit} className={className}>
+    <form
+      ref={formRef}
+      onSubmit={handleSubmit}
+      onFocusCapture={() => {
+        if (hasStarted) return;
+        pushFormStart({
+          formId: 'admin_inline_form',
+          formName: successMessage,
+          page_path: window.location.pathname,
+          page_url: window.location.href,
+          submitted_at: new Date().toISOString(),
+        });
+        setHasStarted(true);
+      }}
+      className={className}
+    >
       <PendingContext.Provider value={pending}>{children}</PendingContext.Provider>
     </form>
   );
