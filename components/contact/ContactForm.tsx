@@ -5,6 +5,7 @@ import { useState, type FormEvent } from 'react';
 
 import Reveal from '@/components/ui/Reveal';
 import { submitContact } from '@/app/actions/submissions';
+import { pushFormStart, pushFormSubmit } from '@/lib/gtm';
 
 const fields = [
   { name: 'firstName', placeholder: 'First Name', type: 'text', autoComplete: 'given-name' },
@@ -13,23 +14,11 @@ const fields = [
   { name: 'email', placeholder: 'Email', type: 'email', autoComplete: 'email' },
 ] as const;
 
-function pushGtmFormSubmitEvent(details: Record<string, unknown>) {
-  if (typeof window === 'undefined') return;
-  try {
-    (window as any).dataLayer = (window as any).dataLayer || [];
-    (window as any).dataLayer.push({ event: 'form_submit', ...details });
-    // eslint-disable-next-line no-console
-    console.log('[GTM] dataLayer pushed', { event: 'form_submit', ...details });
-  } catch (err) {
-    // eslint-disable-next-line no-console
-    console.warn('[GTM] dataLayer push failed', err);
-  }
-}
-
 export default function ContactForm() {
   const [sent, setSent] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [hasStarted, setHasStarted] = useState(false);
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -38,21 +27,28 @@ export default function ContactForm() {
     const form = event.currentTarget;
     const result = await submitContact(new FormData(form));
     setSubmitting(false);
+
     if (result.ok) {
+      console.debug('[Contact] successful submit; pushing form_submit');
+      pushFormSubmit({
+        formId: 'contact_form',
+        formName: 'Contact Form',
+        page_path: window.location.pathname,
+        page_url: window.location.href,
+        submitted_at: new Date().toISOString(),
+      });
       setSent(true);
       form.reset();
-      pushGtmFormSubmitEvent({ formId: 'contact_form', formName: 'Contact Form', page_path: window.location.pathname, page_url: window.location.href });
-    } else {
-      setError(result.error);
+      return;
     }
+
+    setError(result.error);
   };
 
   return (
-    // No bottom padding here — the footer's own top padding provides the gap.
     <section>
       <div className="shell">
         <div className="relative overflow-hidden rounded-[26px] bg-rose px-6 py-14 sm:px-10 lg:px-16 lg:py-[96px]">
-          {/* The site's own rose panel artwork — a faint helix watermark */}
           <Image
             src="/images/contact-bg.jpg"
             alt=""
@@ -70,7 +66,20 @@ export default function ContactForm() {
               the first step toward better health and wellness. Reach out to us today!
             </p>
 
-            <form onSubmit={handleSubmit} className="mt-12 text-left">
+            <form
+              onSubmit={handleSubmit}
+              onFocusCapture={() => {
+                if (hasStarted) return;
+                pushFormStart({
+                  formId: 'contact_form',
+                  formName: 'Contact Form',
+                  page_path: window.location.pathname,
+                  page_url: window.location.href,
+                });
+                setHasStarted(true);
+              }}
+              className="mt-12 text-left"
+            >
               <div className="grid gap-5 sm:grid-cols-2">
                 {fields.map((field) => (
                   <div key={field.name}>
