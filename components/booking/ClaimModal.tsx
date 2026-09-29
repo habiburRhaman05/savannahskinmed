@@ -5,6 +5,7 @@ import { useEffect, useRef, useState, type FormEvent } from 'react';
 
 import { CloseIcon } from '@/components/icons';
 import { submitClaim } from '@/app/actions/submissions';
+import { pushFormStart, pushFormSubmit } from '@/lib/gtm';
 
 type ClaimModalProps = {
   open: boolean;
@@ -47,6 +48,7 @@ export default function ClaimModal({ open, onClose, offerId, offerLabel }: Claim
   const [sent, setSent] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [hasStarted, setHasStarted] = useState(false);
 
   const panelRef = useRef<HTMLDivElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
@@ -59,8 +61,18 @@ export default function ClaimModal({ open, onClose, offerId, offerLabel }: Claim
     if (open) {
       document.body.style.overflow = 'hidden';
       closeRef.current?.focus();
+      if (!hasStarted) {
+        pushFormStart({
+          formId: 'claim_modal',
+          formName: 'Claim Aesthetic Special',
+          page_path: window.location.pathname,
+          page_url: window.location.href,
+        });
+        setHasStarted(true);
+      }
     } else {
       document.body.style.overflow = '';
+      setHasStarted(false);
       setTimeout(() => {
         setSent(false);
         setError(null);
@@ -69,7 +81,7 @@ export default function ClaimModal({ open, onClose, offerId, offerLabel }: Claim
     return () => {
       document.body.style.overflow = '';
     };
-  }, [open]);
+  }, [open, hasStarted]);
 
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
@@ -90,13 +102,24 @@ export default function ClaimModal({ open, onClose, offerId, offerLabel }: Claim
     const formData = new FormData(e.currentTarget);
     if (offerId) formData.set('offerId', offerId);
     if (offerLabel) formData.set('offerLabel', offerLabel);
+
     const result = await submitClaim(formData);
     setSubmitting(false);
+
     if (result.ok) {
+      console.debug('[Claim] successful submit; pushing form_submit');
+      pushFormSubmit({
+        formId: 'claim_modal',
+        formName: 'Claim Aesthetic Special',
+        page_path: window.location.pathname,
+        page_url: window.location.href,
+        submitted_at: new Date().toISOString(),
+      });
       setSent(true);
-    } else {
-      setError(result.error);
+      return;
     }
+
+    setError(result.error);
   };
 
   return createPortal(
@@ -141,7 +164,21 @@ export default function ClaimModal({ open, onClose, offerId, offerLabel }: Claim
             </button>
           </div>
         ) : (
-          <form onSubmit={handleSubmit} className="mt-9 space-y-4">
+          <form
+            onSubmit={handleSubmit}
+            onFocusCapture={() => {
+              if (!hasStarted) {
+                pushFormStart({
+                  formId: 'claim_modal',
+                  formName: 'Claim Aesthetic Special',
+                  page_path: window.location.pathname,
+                  page_url: window.location.href,
+                });
+                setHasStarted(true);
+              }
+            }}
+            className="mt-9 space-y-4"
+          >
             <Field id="name" label="Name" autoComplete="name" />
             <Field id="email" label="E-mail Address" type="email" autoComplete="email" />
             <Field id="phone" label="Phone" type="tel" autoComplete="tel" />
